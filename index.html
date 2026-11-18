@@ -94,9 +94,15 @@ async function push(){
   }catch(e){setDirty(true);cstat('☁ pendente (sem conexão)')}
 }
 async function connect(){
-  const g=i=>$(i).value.trim();cc={url:g('#c-url').replace(/\/+$/,''),key:g('#c-key')};
-  try{await auth({email:g('#c-mail'),password:$('#c-pw').value},'password');cc.mail=g('#c-mail');csave();await pull(true);toast('Nuvem conectada');render()}
-  catch(e){cc=null;localStorage.removeItem(CK);toast('Falha: '+e.message)}
+  const g=i=>$(i).value.trim(),clean=v=>v.replace(/^[A-Za-z_]+\s*=\s*/,'').replace(/["'\s]/g,''),
+  um=clean(g('#c-url')).match(/^https?:\/\/[^\/]+/),key=clean(g('#c-key'));
+  if(!um){toast('A Project URL parece errada. Use https://xxxx.supabase.co');return}
+  if(!key){toast('Cole a chave publishable');return}
+  cc={url:um[0],key};
+  try{await auth({email:g('#c-mail'),password:$('#c-pw').value},'password')}
+  catch(e){cc=null;localStorage.removeItem(CK);const m=String(e.message);toast(/Failed to fetch|Load failed|NetworkError/i.test(m)?'Não consegui acessar a URL. Confira a Project URL e se o projeto não está pausado.':/Invalid login/i.test(m)?'E-mail ou senha incorretos. O usuário foi criado em Authentication > Users?':/not confirmed/i.test(m)?'E-mail não confirmado. No Supabase, confirme o usuário em Authentication > Users.':/api key|apikey/i.test(m)?'Chave inválida. Use a chave publishable (sb_publishable_...).':'Falha no login: '+m);return}
+  try{cc.mail=g('#c-mail');csave();await pull(true);toast('Nuvem conectada');render()}
+  catch(e){const m=String(e.message);cc=null;localStorage.removeItem(CK);toast(/app_data|relation|PGRST|schema cache/i.test(m)?'Login ok, mas faltam as tabelas. Rode o SQL no SQL Editor do Supabase.':'Falha ao sincronizar: '+m.slice(0,80))}
 }
 async function hist(){
   try{const r=await api('app_snapshots?select=day&order=day.desc');$('#hist').innerHTML=(r&&r.length?r.map(x=>`<button class="chip" data-a="snap" data-id="${x.day}">${fd(x.day)}</button>`).join(' '):'<small>Nenhuma versão ainda.</small>')}catch(e){toast('Sem conexão')}
